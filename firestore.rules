@@ -8,7 +8,7 @@ service cloud.firestore {
     // Collection: academic_years
     // Document ID: auto-generated
     // Fields:
-    //   - year: string (required) - e.g., "2567"
+    //   - year: string (required) - e.g., "2568"
     //   - status: string (required) - "active" | "archived"
     //
     // Collection: courses
@@ -128,8 +128,10 @@ service cloud.firestore {
              data.instructorId is string && data.instructorId.size() > 0 &&
              data.name is string && data.name.size() > 0 &&
              data.position is string &&
-             isValidEmail(data.email) &&
+             (data.email == 'ไม่ระบุ' || isValidEmail(data.email)) &&
              data.department is string &&
+             (!('phone' in data) || data.phone is string) &&
+             (!('updatedAt' in data) || data.updatedAt is string) &&
              (!('uid' in data) || data.uid is string);
     }
 

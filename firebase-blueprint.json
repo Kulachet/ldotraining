@@ -7,7 +7,7 @@
       "properties": {
         "year": {
           "type": "string",
-          "description": "The academic year (e.g., 2566, 2567)."
+          "description": "The academic year (e.g., 2567, 2568)."
         },
         "status": {
           "type": "string",

@@ -105,7 +105,8 @@ export default function InstructorMaster({ user }: Props) {
                     email: email || 'ไม่ระบุ',
                     phone: phone || 'ไม่ระบุ',
                     department: dept || 'ไม่ระบุ',
-                    updatedAt: new Date().toISOString()
+                    updatedAt: new Date().toISOString(),
+                    uid: user?.uid || 'system'
                   });
                   processedCount++;
                 }
@@ -114,9 +115,9 @@ export default function InstructorMaster({ user }: Props) {
             }
 
             setResult({ success: processedCount, total: data.length });
-          } catch (err) {
+          } catch (err: any) {
             console.error(err);
-            setError('เกิดข้อผิดพลาดในการอัปโหลดข้อมูล');
+            setError('เกิดข้อผิดพลาดในการอัปโหลดข้อมูล: ' + (err.message || 'โปรดตรวจสอบสิทธิ์การใช้งานหรือรูปแบบไฟล์'));
           } finally {
             setUploading(false);
           }
@@ -181,7 +182,11 @@ export default function InstructorMaster({ user }: Props) {
                   </select>
                 </div>
                 
-                <label className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-xl font-medium cursor-pointer hover:bg-primary/90 transition-all shadow-lg shadow-primary/10">
+                <label className={`inline-flex items-center gap-2 px-6 py-3 rounded-xl font-medium cursor-pointer transition-all shadow-lg shadow-primary/10 ${
+                  !user 
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                    : 'bg-primary text-white hover:bg-primary/90'
+                }`}>
                   {uploading ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" />
@@ -198,9 +203,14 @@ export default function InstructorMaster({ user }: Props) {
                     accept=".csv" 
                     className="hidden" 
                     onChange={handleFileUpload}
-                    disabled={uploading}
+                    disabled={uploading || !user}
                   />
                 </label>
+                {!user && (
+                  <p className="mt-4 text-red-500 text-xs font-bold">
+                    * กรุณาเข้าสู่ระบบด้วย Google ก่อนทำการอัปโหลดข้อมูล
+                  </p>
+                )}
               </div>
 
               {result && (

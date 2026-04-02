@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, onSnapshot, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, where, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { AcademicYear, Course, Registration } from '../types';
 import { 
@@ -14,7 +14,7 @@ import {
   PieChart,
   Pie
 } from 'recharts';
-import { Users, BookOpen, Calendar, Printer, FileText } from 'lucide-react';
+import { Users, BookOpen, Calendar, Printer, FileText, Plus } from 'lucide-react';
 import { motion } from 'motion/react';
 import { formatDate } from '../utils';
 
@@ -29,6 +29,7 @@ interface Props {
 export default function Dashboard({ academicYears, courses, user }: Props) {
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSeeding, setIsSeeding] = useState(false);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'registrations'), (snap) => {
@@ -40,6 +41,57 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
     });
     return () => unsub();
   }, [user]);
+
+  const seedDemoData = async () => {
+    if (!user) return;
+    setIsSeeding(true);
+    try {
+      // 1. Add Academic Year 2568
+      const yearRef = await addDoc(collection(db, 'academic_years'), {
+        year: '2568',
+        status: 'active'
+      });
+
+      // 2. Add Sample Courses
+      const sampleCourses = [
+        {
+          title: 'การใช้ AI ในการจัดการเรียนการสอน (Generative AI for Educators)',
+          academicYearId: yearRef.id,
+          date: Timestamp.fromDate(new Date('2026-05-15')),
+          startTime: '09:00',
+          endTime: '16:00',
+          speaker: 'ดร.สมชาย ใจดี',
+          description: 'เรียนรู้การใช้ ChatGPT และ Gemini ในการสร้างสื่อการสอน',
+          maxParticipants: 50,
+          room: 'A3-201',
+          published: true,
+          registrationCount: 0
+        },
+        {
+          title: 'เทคนิคการออกแบบสื่อการสอนด้วย Canva',
+          academicYearId: yearRef.id,
+          date: Timestamp.fromDate(new Date('2026-06-10')),
+          startTime: '13:00',
+          endTime: '16:00',
+          speaker: 'อ.วิภาวรรณ รักเรียน',
+          description: 'Workshop การออกแบบ Infographic และ Presentation',
+          maxParticipants: 40,
+          room: 'Online (Zoom)',
+          published: true,
+          registrationCount: 0
+        }
+      ];
+
+      for (const course of sampleCourses) {
+        await addDoc(collection(db, 'courses'), course);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("เกิดข้อผิดพลาดในการสร้างข้อมูลตัวอย่าง: " + (err instanceof Error ? err.message : ''));
+    } finally {
+      setIsSeeding(false);
+    }
+  };
 
   // Data Processing
   const statsByCourse = courses.map(course => {
@@ -66,11 +118,21 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
     return year?.status === 'active';
   }).length;
 
+  const isEmpty = academicYears.length === 0 && courses.length === 0;
+
   const handlePrint = () => {
     window.print();
   };
 
   const COLORS = ['#E12D2D', '#F15A24', '#8E9299', '#1a1a1a', '#F27D26'];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto print:p-0">
@@ -79,14 +141,73 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
           <h1 className="text-3xl font-bold text-gray-900 serif mb-2">แดชบอร์ดสรุปผล</h1>
           <p className="text-gray-500">ภาพรวมการลงทะเบียนอบรมวิชาการ</p>
         </div>
-        <button 
-          onClick={handlePrint}
-          className="flex items-center gap-2 bg-white border border-gray-200 px-4 py-2 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors shadow-sm"
-        >
-          <Printer className="w-4 h-4" />
-          พิมพ์รายงาน
-        </button>
+        <div className="flex gap-3">
+          <button 
+            onClick={handlePrint}
+            className="flex items-center gap-2 bg-white border border-gray-200 px-4 py-2 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors shadow-sm"
+          >
+            <Printer className="w-4 h-4" />
+            พิมพ์รายงาน
+          </button>
+        </div>
       </div>
+
+      {!user && (
+        <div className="bg-red-50 border border-red-100 p-4 rounded-2xl flex items-center gap-3 text-red-800">
+          <Users className="w-5 h-5 flex-shrink-0" />
+          <div>
+            <p className="font-bold text-sm">คุณยังไม่ได้เข้าสู่ระบบด้วย Google</p>
+            <p className="text-[10px] opacity-70 mt-1">ข้อมูล "จำนวนผู้ลงทะเบียน" จะไม่แสดงหากคุณไม่ได้เข้าสู่ระบบด้วย Google เพื่อยืนยันสิทธิ์การเข้าถึงข้อมูลส่วนบุคคล</p>
+          </div>
+        </div>
+      )}
+
+      {/* Connection Status Indicator */}
+      <div className="mb-6 flex flex-wrap gap-2 items-center text-xs font-mono bg-gray-50 p-3 rounded-xl border border-gray-100">
+        <div className="flex items-center gap-1.5">
+          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+          <span className="text-gray-500">Connected:</span>
+        </div>
+        <span className="bg-white px-2 py-0.5 rounded border border-gray-200 text-gray-700">
+          Project: {db.app.options.projectId}
+        </span>
+        <span className="bg-white px-2 py-0.5 rounded border border-gray-200 text-gray-700">
+          Database: {(db as any).databaseId || '(default)'}
+        </span>
+        {user && (
+          <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100">
+            User: {user.email}
+          </span>
+        )}
+      </div>
+
+      {isEmpty && (
+        <div className="bg-amber-50 border border-amber-100 p-8 rounded-3xl text-center">
+          <BookOpen className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+          <h3 className="text-lg font-bold text-amber-900 mb-2">ไม่พบข้อมูลในระบบ</h3>
+          <p className="text-sm text-amber-700 mb-6 max-w-md mx-auto">
+            หากคุณเพิ่งทำการ Remix แอป หรือเพิ่งเริ่มใช้งานครั้งแรก ฐานข้อมูลจะยังว่างเปล่า 
+            คุณสามารถเริ่มสร้างข้อมูลเองได้ที่เมนู "จัดการหลักสูตร" หรือใช้ปุ่มด้านล่างเพื่อสร้างข้อมูลตัวอย่าง
+          </p>
+          <button 
+            onClick={seedDemoData}
+            disabled={isSeeding}
+            className="inline-flex items-center gap-2 bg-amber-500 text-white px-6 py-3 rounded-xl font-bold hover:bg-amber-600 transition-all shadow-lg shadow-amber-200 disabled:opacity-50"
+          >
+            {isSeeding ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                กำลังสร้างข้อมูล...
+              </>
+            ) : (
+              <>
+                <Plus className="w-5 h-5" />
+                สร้างข้อมูลตัวอย่าง (Seed Demo Data)
+              </>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

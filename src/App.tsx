@@ -188,6 +188,27 @@ export default function App() {
                 Sign In
               </button>
               
+              {!user && (
+                <div className="pt-4">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="h-px bg-gray-100 flex-1"></div>
+                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">OR</span>
+                    <div className="h-px bg-gray-100 flex-1"></div>
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={handleLogin}
+                    className="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 text-gray-700 py-4 rounded-full font-bold hover:bg-gray-50 transition-all shadow-sm text-sm"
+                  >
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
+                    Sign in with Google
+                  </button>
+                  <p className="mt-2 text-[10px] text-red-500 font-bold text-center italic">
+                    * จำเป็นต้องใช้ Google Login เพื่อจัดการฐานข้อมูล
+                  </p>
+                </div>
+              )}
+              
               <div className="pt-8 text-center">
                 <p className="text-xs text-gray-400">
                   Don't have access? <span className="text-primary font-bold cursor-pointer hover:underline">Request Access</span>

@@ -334,7 +334,7 @@ export default function CourseManagement({ academicYears, courses }: Props) {
                 <input 
                   autoFocus
                   type="text" 
-                  placeholder="เช่น 2567" 
+                  placeholder="เช่น 2568" 
                   className="w-full text-center font-bold text-lg mb-2 focus:outline-none"
                   value={newYear}
                   onChange={e => setNewYear(e.target.value)}
