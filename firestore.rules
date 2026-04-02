@@ -1,0 +1,192 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: academic_years
+    // Document ID: auto-generated
+    // Fields:
+    //   - year: string (required) - e.g., "2567"
+    //   - status: string (required) - "active" | "archived"
+    //
+    // Collection: courses
+    // Document ID: auto-generated
+    // Fields:
+    //   - title: string (required) - Course title
+    //   - academicYearId: string (required) - Reference to academic_years
+    //   - date: string (required) - ISO date string
+    //   - startTime: string (required) - e.g., "09:00"
+    //   - endTime: string (required) - e.g., "12:00"
+    //   - speaker: string (required) - Speaker name
+    //   - description: string (optional) - Course details
+    //   - maxParticipants: number (required) - Capacity
+    //   - room: string (optional) - Location
+    //   - published: boolean (required) - Visibility toggle
+    //
+    // Collection: instructors_master
+    // Document ID: instructorId (uppercase)
+    // Fields:
+    //   - instructorId: string (required) - Employee ID
+    //   - name: string (required) - Full name
+    //   - position: string (required) - Job title
+    //   - email: string (required) - Contact email
+    //   - phone: string (optional) - Contact number
+    //   - department: string (required) - Unit name
+    //   - updatedAt: string (required) - ISO timestamp
+    //
+    // Collection: registrations
+    // Document ID: auto-generated
+    // Fields:
+    //   - instructorId: string (required) - Reference to instructor
+    //   - courseId: string (required) - Reference to course
+    //   - academicYearId: string (required) - Reference to year
+    //   - timestamp: timestamp (required) - Registration time
+    //   - instructorName: string (required) - Denormalized name
+    //   - instructorPosition: string (optional) - Denormalized position
+    //   - department: string (required) - Denormalized department
+    //
+    // Collection: evaluations
+    // Document ID: auto-generated
+    // Fields:
+    //   - courseId: string (required) - Reference to course
+    //   - ratings: list (required) - Array of 10 numbers (1-5)
+    //   - suggestion: string (optional) - Feedback
+    //   - timestamp: timestamp (required) - Submission time
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'admin') ||
+         (request.auth.token.email == "kulachet.l@bu.ac.th" && request.auth.token.email_verified == true));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // Domain Validators
+    function isValidAcademicYear(data) {
+      return data.keys().hasAll(['year', 'status']) &&
+             data.year is string && data.year.size() > 0 && data.year.size() < 10 &&
+             data.status in ['active', 'archived'];
+    }
+
+    function isValidCourse(data) {
+      return data.keys().hasAll(['title', 'academicYearId', 'date', 'startTime', 'endTime', 'speaker', 'maxParticipants', 'published']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.academicYearId is string &&
+             data.date is timestamp &&
+             data.startTime is string &&
+             data.endTime is string &&
+             data.speaker is string && data.speaker.size() > 0 &&
+             data.maxParticipants is number && data.maxParticipants > 0 &&
+             data.published is bool &&
+             (!('posterUrl' in data) || (data.posterUrl is string && data.posterUrl.size() < 1000)) &&
+             (!('registrationCount' in data) || data.registrationCount is number);
+    }
+
+    function isValidRegistration(data) {
+      return data.keys().hasAll(['instructorId', 'courseId', 'academicYearId', 'timestamp', 'instructorName', 'department']) &&
+             data.instructorId is string && data.instructorId.size() > 0 &&
+             data.courseId is string &&
+             data.academicYearId is string &&
+             data.timestamp is timestamp &&
+             data.instructorName is string && data.instructorName.size() > 0 &&
+             data.department is string && data.department.size() > 0 &&
+             (!('uid' in data) || data.uid is string);
+    }
+
+    function isValidEvaluation(data) {
+      return data.keys().hasAll(['courseId', 'ratings', 'timestamp']) &&
+             data.courseId is string &&
+             data.ratings is list && data.ratings.size() == 10 &&
+             data.timestamp is timestamp &&
+             (!('suggestion' in data) || (data.suggestion is string && data.suggestion.size() < 2000)) &&
+             data.ratings[0] >= 1 && data.ratings[0] <= 5 &&
+             data.ratings[1] >= 1 && data.ratings[1] <= 5 &&
+             data.ratings[2] >= 1 && data.ratings[2] <= 5 &&
+             data.ratings[3] >= 1 && data.ratings[3] <= 5 &&
+             data.ratings[4] >= 1 && data.ratings[4] <= 5 &&
+             data.ratings[5] >= 1 && data.ratings[5] <= 5 &&
+             data.ratings[6] >= 1 && data.ratings[6] <= 5 &&
+             data.ratings[7] >= 1 && data.ratings[7] <= 5 &&
+             data.ratings[8] >= 1 && data.ratings[8] <= 5 &&
+             data.ratings[9] >= 1 && data.ratings[9] <= 5;
+    }
+
+    function isValidInstructor(data) {
+      return data.keys().hasAll(['instructorId', 'name', 'position', 'email', 'department']) &&
+             data.instructorId is string && data.instructorId.size() > 0 &&
+             data.name is string && data.name.size() > 0 &&
+             data.position is string &&
+             isValidEmail(data.email) &&
+             data.department is string &&
+             (!('uid' in data) || data.uid is string);
+    }
+
+    // Rules
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    match /academic_years/{yearId} {
+      // Allow public read so the registration form can show years even before login
+      allow read: if true;
+      allow write: if isAdmin() && isValidAcademicYear(request.resource.data);
+    }
+
+    match /courses/{courseId} {
+      // Allow public read so the registration form can show courses even before login
+      allow read: if true;
+      allow create: if isAdmin() && isValidCourse(request.resource.data);
+      allow update: if (isAdmin() && isValidCourse(request.resource.data)) ||
+                    (isAuthenticated() && 
+                     request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registrationCount']) &&
+                     (
+                       // Transition: if registrationCount doesn't exist, allow setting it to any positive number
+                       (!('registrationCount' in resource.data) && request.resource.data.registrationCount >= 1) ||
+                       // Normal case: increment by 1
+                       (request.resource.data.registrationCount == resource.data.registrationCount + 1)
+                     )
+                    );
+      allow delete: if isAdmin();
+    }
+
+    match /instructors_master/{instrId} {
+      // Instructors master contains PII (email, phone). 
+      // We allow authenticated users to read for lookup and auto-fill.
+      allow read: if isAuthenticated();
+      // Allow authenticated users to create their own record if it doesn't exist
+      allow create: if isAuthenticated() && isValidInstructor(request.resource.data);
+      allow update: if isAdmin() || (isAuthenticated() && resource.data.uid == request.auth.uid);
+    }
+
+    match /registrations/{regId} {
+      // Allow authenticated users to read registrations (needed for counting and duplicate checks)
+      // In a production app, we might want to restrict this more, but for now it's necessary for the logic.
+      allow read: if isAuthenticated();
+      // Users can create registrations if they are logged in
+      allow create: if isAuthenticated() && isValidRegistration(request.resource.data);
+      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.uid == request.auth.uid);
+    }
+
+    match /evaluations/{evalId} {
+      // Admins can read all evaluations for the dashboard
+      allow read: if isAdmin();
+      // Public can create evaluations (no login required)
+      allow create: if isValidEvaluation(request.resource.data);
+      // No one can update or delete evaluations
+      allow update, delete: if false;
+    }
+  }
+}

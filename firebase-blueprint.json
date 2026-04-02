@@ -1,0 +1,145 @@
+{
+  "entities": {
+    "AcademicYear": {
+      "title": "Academic Year",
+      "description": "Stores academic periods for training courses.",
+      "type": "object",
+      "properties": {
+        "year": {
+          "type": "string",
+          "description": "The academic year (e.g., 2566, 2567)."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "archived"],
+          "description": "Current status of the academic year."
+        }
+      },
+      "required": ["year", "status"]
+    },
+    "Course": {
+      "title": "Training Course",
+      "description": "Details of academic training courses.",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Course title."
+        },
+        "academicYearId": {
+          "type": "string",
+          "description": "Reference to the academic year document ID."
+        },
+        "date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Training date."
+        },
+        "speaker": {
+          "type": "string",
+          "description": "Name of the speaker/instructor."
+        },
+        "description": {
+          "type": "string",
+          "description": "Course description."
+        },
+        "maxParticipants": {
+          "type": "number",
+          "description": "Maximum number of participants allowed."
+        },
+        "room": {
+          "type": "string",
+          "description": "Training room or location."
+        },
+        "posterUrl": {
+          "type": "string",
+          "description": "URL of the course poster image."
+        }
+      },
+      "required": ["title", "academicYearId", "date"]
+    },
+    "InstructorMaster": {
+      "title": "Instructor Master Data",
+      "description": "Master list of university instructors for ID matching.",
+      "type": "object",
+      "properties": {
+        "instructorId": {
+          "type": "string",
+          "description": "University Employee ID."
+        },
+        "position": {
+          "type": "string",
+          "description": "Job position."
+        },
+        "name": {
+          "type": "string",
+          "description": "Full name of the instructor."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address."
+        },
+        "phone": {
+          "type": "string",
+          "description": "Phone number."
+        },
+        "department": {
+          "type": "string",
+          "description": "Department or unit name."
+        }
+      },
+      "required": ["instructorId", "name", "department"]
+    },
+    "Registration": {
+      "title": "Course Registration",
+      "description": "Records of instructors registering for courses.",
+      "type": "object",
+      "properties": {
+        "instructorId": {
+          "type": "string",
+          "description": "University Employee ID."
+        },
+        "courseId": {
+          "type": "string",
+          "description": "Reference to the course document ID."
+        },
+        "academicYearId": {
+          "type": "string",
+          "description": "Reference to the academic year ID for reporting."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Registration timestamp."
+        },
+        "instructorName": {
+          "type": "string",
+          "description": "Denormalized name for reporting."
+        },
+        "department": {
+          "type": "string",
+          "description": "Denormalized department for reporting."
+        }
+      },
+      "required": ["instructorId", "courseId", "academicYearId", "timestamp"]
+    }
+  },
+  "firestore": {
+    "academic_years": {
+      "schema": "AcademicYear",
+      "description": "Collection of academic years."
+    },
+    "courses": {
+      "schema": "Course",
+      "description": "Collection of training courses."
+    },
+    "instructors_master": {
+      "schema": "InstructorMaster",
+      "description": "Master list of instructors."
+    },
+    "registrations": {
+      "schema": "Registration",
+      "description": "Registration transactions."
+    }
+  }
+}

@@ -1,0 +1,299 @@
+import React, { useState, useEffect } from 'react';
+import { collection, query, onSnapshot, where } from 'firebase/firestore';
+import { db } from '../firebase';
+import { AcademicYear, Course, Registration } from '../types';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer, 
+  Cell,
+  PieChart,
+  Pie
+} from 'recharts';
+import { Users, BookOpen, Calendar, Printer, FileText } from 'lucide-react';
+import { motion } from 'motion/react';
+import { formatDate } from '../utils';
+
+import { User } from 'firebase/auth';
+
+interface Props {
+  academicYears: AcademicYear[];
+  courses: Course[];
+  user: User | null;
+}
+
+export default function Dashboard({ academicYears, courses, user }: Props) {
+  const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'registrations'), (snap) => {
+      setRegistrations(snap.docs.map(d => ({ id: d.id, ...d.data() } as Registration)));
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching registrations:", error);
+      setLoading(false);
+    });
+    return () => unsub();
+  }, [user]);
+
+  // Data Processing
+  const statsByCourse = courses.map(course => {
+    const count = registrations.filter(r => r.courseId === course.id).length;
+    return {
+      name: course.title.length > 20 ? course.title.substring(0, 20) + '...' : course.title,
+      fullName: course.title,
+      count,
+      capacity: course.maxParticipants
+    };
+  });
+
+  const statsByYear = academicYears.map(year => {
+    const count = registrations.filter(r => r.academicYearId === year.id).length;
+    return {
+      name: year.year,
+      count
+    };
+  });
+
+  const totalRegistrations = registrations.length;
+  const activeCourses = courses.filter(c => {
+    const year = academicYears.find(y => y.id === c.academicYearId);
+    return year?.status === 'active';
+  }).length;
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const COLORS = ['#E12D2D', '#F15A24', '#8E9299', '#1a1a1a', '#F27D26'];
+
+  return (
+    <div className="space-y-8 max-w-7xl mx-auto print:p-0">
+      <div className="flex justify-between items-center print:hidden">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 serif mb-2">แดชบอร์ดสรุปผล</h1>
+          <p className="text-gray-500">ภาพรวมการลงทะเบียนอบรมวิชาการ</p>
+        </div>
+        <button 
+          onClick={handlePrint}
+          className="flex items-center gap-2 bg-white border border-gray-200 px-4 py-2 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors shadow-sm"
+        >
+          <Printer className="w-4 h-4" />
+          พิมพ์รายงาน
+        </button>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <StatCard 
+          icon={<Users className="w-6 h-6 text-primary" />}
+          label="จำนวนผู้ลงทะเบียนทั้งหมด"
+          value={totalRegistrations}
+          subLabel="คน"
+        />
+        <StatCard 
+          icon={<BookOpen className="w-6 h-6 text-primary" />}
+          label="หลักสูตรที่เปิดรับ (Active)"
+          value={activeCourses}
+          subLabel="หลักสูตร"
+        />
+        <StatCard 
+          icon={<Calendar className="w-6 h-6 text-primary" />}
+          label="ปีการศึกษาปัจจุบัน"
+          value={academicYears.find(y => y.status === 'active')?.year || '-'}
+          subLabel=""
+        />
+      </div>
+
+      {/* Remaining Seats Summary Table */}
+      <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 print:hidden">
+        <h3 className="font-bold serif mb-6 flex items-center gap-2">
+          <Users className="w-5 h-5 text-primary" />
+          สรุปจำนวนที่นั่งคงเหลือ (Active Courses)
+        </h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-gray-100">
+                <th className="py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">หลักสูตร</th>
+                <th className="py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">ลงทะเบียนแล้ว</th>
+                <th className="py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">รับทั้งหมด</th>
+                <th className="py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">คงเหลือ</th>
+                <th className="py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">สถานะ</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {courses.filter(c => {
+                const year = academicYears.find(y => y.id === c.academicYearId);
+                return year?.status === 'active' && c.published === true;
+              }).map(course => {
+                const count = registrations.filter(r => r.courseId === course.id).length;
+                const remaining = Math.max(0, course.maxParticipants - count);
+                const isFull = remaining <= 0;
+                return (
+                  <tr key={course.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="py-4">
+                      <p className="text-sm font-bold text-gray-900">{course.title}</p>
+                      <p className="text-[10px] text-gray-400 uppercase">{formatDate(course.date)}</p>
+                    </td>
+                    <td className="py-4 text-center font-bold text-gray-700">{count}</td>
+                    <td className="py-4 text-center text-gray-500">{course.maxParticipants}</td>
+                    <td className="py-4 text-center">
+                      <span className={`font-black ${remaining <= 5 ? 'text-red-500' : 'text-green-600'}`}>
+                        {remaining}
+                      </span>
+                    </td>
+                    <td className="py-4 text-center">
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
+                        isFull ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'
+                      }`}>
+                        {isFull ? 'เต็มแล้ว' : 'เปิดรับ'}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Chart: Registrations by Course */}
+        <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+          <h3 className="font-bold serif mb-6 flex items-center gap-2">
+            <FileText className="w-5 h-5 text-primary" />
+            จำนวนผู้ลงทะเบียนรายหลักสูตร
+          </h3>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={statsByCourse} layout="vertical" margin={{ left: 40, right: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
+                <XAxis type="number" hide />
+                <YAxis 
+                  dataKey="name" 
+                  type="category" 
+                  width={150} 
+                  tick={{ fontSize: 10, fill: '#888' }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip 
+                  cursor={{ fill: '#f5f5f0' }}
+                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                />
+                <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                  {statsByCourse.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Chart: Registrations by Year */}
+        <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+          <h3 className="font-bold serif mb-6 flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-primary" />
+            สถิติการลงทะเบียนรายปีการศึกษา
+          </h3>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={statsByYear}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={5}
+                  dataKey="count"
+                >
+                  {statsByYear.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="flex flex-wrap justify-center gap-4 mt-4">
+            {statsByYear.map((entry, index) => (
+              <div key={entry.name} className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                <span className="text-xs text-gray-500 font-medium">ปี {entry.name} ({entry.count})</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Print Report View (Hidden in UI, visible in Print) */}
+      <div className="hidden print:block">
+        <div className="text-center mb-10">
+          <h1 className="text-2xl font-bold serif">รายงานสรุปผลการลงทะเบียนอบรมวิชาการ</h1>
+          <p className="text-gray-500">สำนักพัฒนาการเรียนรู้ มหาวิทยาลัยกรุงเทพ</p>
+        </div>
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="border-b-2 border-gray-200">
+              <th className="text-left py-4 font-bold serif">หลักสูตร</th>
+              <th className="text-center py-4 font-bold serif">วัน/เวลา</th>
+              <th className="text-center py-4 font-bold serif">ห้อง</th>
+              <th className="text-center py-4 font-bold serif">ปีการศึกษา</th>
+              <th className="text-center py-4 font-bold serif">จำนวนผู้ลงทะเบียน</th>
+              <th className="text-center py-4 font-bold serif">สถานะ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {courses.map(course => {
+              const year = academicYears.find(y => y.id === course.academicYearId);
+              const count = registrations.filter(r => r.courseId === course.id).length;
+              return (
+                <tr key={course.id} className="border-b border-gray-100">
+                  <td className="py-4">{course.title}</td>
+                  <td className="text-center py-4 text-xs">
+                    {formatDate(course.date)}<br/>
+                    {course.startTime} - {course.endTime}
+                  </td>
+                  <td className="text-center py-4">{course.room || '-'}</td>
+                  <td className="text-center py-4">{year?.year}</td>
+                  <td className="text-center py-4 font-bold">{count} / {course.maxParticipants}</td>
+                  <td className="text-center py-4">
+                    {count >= course.maxParticipants ? 'เต็ม' : 'เปิดรับ'}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ icon, label, value, subLabel }: { icon: React.ReactNode, label: string, value: string | number, subLabel: string }) {
+  return (
+    <motion.div 
+      whileHover={{ y: -5 }}
+      className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-5"
+    >
+      <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center">
+        {icon}
+      </div>
+      <div>
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{label}</p>
+        <div className="flex items-baseline gap-1">
+          <span className="text-2xl font-bold serif">{value}</span>
+          <span className="text-xs text-gray-500">{subLabel}</span>
+        </div>
+      </div>
+    </motion.div>
+  );
+}

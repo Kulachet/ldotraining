@@ -1,0 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=Anuphan:wght@100;200;300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Anuphan", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Anuphan", serif;
+  --color-primary: #E12D2D;
+  --color-secondary: #F15A24;
+  --color-accent: #E12D2D;
+}
+
+@layer base {
+  .serif {
+    font-family: var(--font-serif);
+  }
+}
+
+@media print {
+  aside {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+    background: white !important;
+  }
+  .print\:hidden {
+    display: none !important;
+  }
+  .print\:block {
+    display: block !important;
+  }
+}
