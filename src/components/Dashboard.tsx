@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot, addDoc, Timestamp } from 'firebase/firestore';
-import { db, databaseId } from '../firebase';
+import { db } from '../firebase';
 import { AcademicYear, Course, Registration } from '../types';
 import {
   BarChart,
@@ -12,7 +12,7 @@ import {
   ResponsiveContainer,
   Cell,
   PieChart,
-  Pie
+  Pie,
 } from 'recharts';
 import { Users, BookOpen, Calendar, Printer, FileText, Plus } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -48,12 +48,12 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
 
   const seedDemoData = async () => {
     if (!user) return;
-
     setIsSeeding(true);
+
     try {
       const yearRef = await addDoc(collection(db, 'academic_years'), {
         year: '2568',
-        status: 'active'
+        status: 'active',
       });
 
       const sampleCourses = [
@@ -68,7 +68,7 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
           maxParticipants: 50,
           room: 'A3-201',
           published: true,
-          registrationCount: 0
+          registrationCount: 0,
         },
         {
           title: 'เทคนิคการออกแบบสื่อการสอนด้วย Canva',
@@ -81,8 +81,8 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
           maxParticipants: 40,
           room: 'Online (Zoom)',
           published: true,
-          registrationCount: 0
-        }
+          registrationCount: 0,
+        },
       ];
 
       for (const course of sampleCourses) {
@@ -90,11 +90,22 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
       }
     } catch (err) {
       console.error(err);
-      alert('เกิดข้อผิดพลาดในการสร้างข้อมูลตัวอย่าง: ' + (err instanceof Error ? err.message : ''));
+      alert(
+        'เกิดข้อผิดพลาดในการสร้างข้อมูลตัวอย่าง: ' +
+          (err instanceof Error ? err.message : '')
+      );
     } finally {
       setIsSeeding(false);
     }
   };
+
+  const activeYearIds = academicYears
+    .filter((y) => y.status === 'active')
+    .map((y) => y.id);
+
+  const activeCoursesList = courses.filter(
+    (c) => activeYearIds.includes(c.academicYearId) && c.published === true
+  );
 
   const statsByCourse = courses.map((course) => {
     const count = registrations.filter((r) => r.courseId === course.id).length;
@@ -102,7 +113,7 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
       name: course.title.length > 20 ? course.title.substring(0, 20) + '...' : course.title,
       fullName: course.title,
       count,
-      capacity: course.maxParticipants
+      capacity: course.maxParticipants,
     };
   });
 
@@ -110,17 +121,12 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
     const count = registrations.filter((r) => r.academicYearId === year.id).length;
     return {
       name: year.year,
-      count
+      count,
     };
   });
 
   const totalRegistrations = registrations.length;
-
-  const activeCourses = courses.filter((c) => {
-    const year = academicYears.find((y) => y.id === c.academicYearId);
-    return year?.status === 'active';
-  }).length;
-
+  const activeCourses = activeCoursesList.length;
   const isEmpty = academicYears.length === 0 && courses.length === 0;
 
   const handlePrint = () => {
@@ -168,21 +174,17 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
         </div>
       )}
 
-      {/* Connection Status Indicator */}
       <div className="mb-6 flex flex-wrap gap-2 items-center text-xs font-mono bg-gray-50 p-3 rounded-xl border border-gray-100">
         <div className="flex items-center gap-1.5">
           <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
           <span className="text-gray-500">Connected:</span>
         </div>
-
         <span className="bg-white px-2 py-0.5 rounded border border-gray-200 text-gray-700">
-          Project: {db.app.options.projectId || 'n8n-real'}
+          Project: {db.app.options.projectId}
         </span>
-
         <span className="bg-white px-2 py-0.5 rounded border border-gray-200 text-gray-700">
-          Database: {databaseId}
+          Database: {(db as any).databaseId || '(default)'}
         </span>
-
         {user && (
           <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100">
             User: {user.email}
@@ -249,49 +251,60 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-gray-100">
-                <th className="py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">หลักสูตร</th>
-                <th className="py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">ลงทะเบียนแล้ว</th>
-                <th className="py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">รับทั้งหมด</th>
-                <th className="py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">คงเหลือ</th>
-                <th className="py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">สถานะ</th>
+                <th className="py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  หลักสูตร
+                </th>
+                <th className="py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">
+                  ลงทะเบียนแล้ว
+                </th>
+                <th className="py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">
+                  รับทั้งหมด
+                </th>
+                <th className="py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">
+                  คงเหลือ
+                </th>
+                <th className="py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">
+                  สถานะ
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {courses
-                .filter((c) => {
-                  const year = academicYears.find((y) => y.id === c.academicYearId);
-                  return year?.status === 'active' && c.published === true;
-                })
-                .map((course) => {
-                  const count = registrations.filter((r) => r.courseId === course.id).length;
-                  const remaining = Math.max(0, course.maxParticipants - count);
-                  const isFull = remaining <= 0;
+              {activeCoursesList.map((course) => {
+                const count = registrations.filter((r) => r.courseId === course.id).length;
+                const remaining = Math.max(0, course.maxParticipants - count);
+                const isFull = remaining <= 0;
 
-                  return (
-                    <tr key={course.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="py-4">
-                        <p className="text-sm font-bold text-gray-900">{course.title}</p>
-                        <p className="text-[10px] text-gray-400 uppercase">{formatDate(course.date)}</p>
-                      </td>
-                      <td className="py-4 text-center font-bold text-gray-700">{count}</td>
-                      <td className="py-4 text-center text-gray-500">{course.maxParticipants}</td>
-                      <td className="py-4 text-center">
-                        <span className={`font-black ${remaining <= 5 ? 'text-red-500' : 'text-green-600'}`}>
-                          {remaining}
-                        </span>
-                      </td>
-                      <td className="py-4 text-center">
-                        <span
-                          className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
-                            isFull ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'
-                          }`}
-                        >
-                          {isFull ? 'เต็มแล้ว' : 'เปิดรับ'}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
+                return (
+                  <tr key={course.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="py-4">
+                      <p className="text-sm font-bold text-gray-900">{course.title}</p>
+                      <p className="text-[10px] text-gray-400 uppercase">
+                        {formatDate(course.date)}
+                      </p>
+                    </td>
+                    <td className="py-4 text-center font-bold text-gray-700">{count}</td>
+                    <td className="py-4 text-center text-gray-500">{course.maxParticipants}</td>
+                    <td className="py-4 text-center">
+                      <span
+                        className={`font-black ${
+                          remaining <= 5 ? 'text-red-500' : 'text-green-600'
+                        }`}
+                      >
+                        {remaining}
+                      </span>
+                    </td>
+                    <td className="py-4 text-center">
+                      <span
+                        className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
+                          isFull ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'
+                        }`}
+                      >
+                        {isFull ? 'เต็มแล้ว' : 'เปิดรับ'}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -321,7 +334,7 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
                   contentStyle={{
                     borderRadius: '12px',
                     border: 'none',
-                    boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)'
+                    boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
                   }}
                 />
                 <Bar dataKey="count" radius={[0, 4, 4, 0]}>
@@ -426,7 +439,7 @@ function StatCard({
   icon,
   label,
   value,
-  subLabel
+  subLabel,
 }: {
   icon: React.ReactNode;
   label: string;
