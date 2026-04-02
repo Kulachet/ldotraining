@@ -1,4 +1,4 @@
-/**
+    /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -17,7 +17,7 @@ import {
   query,
   orderBy,
 } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { auth, db, databaseId } from './firebase';
 import { AcademicYear, Course } from './types';
 import {
   LayoutDashboard,
@@ -31,6 +31,7 @@ import {
   ArrowLeft,
   Lock,
   AlertCircle,
+  Bug,
 } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import CourseManagement from './components/CourseManagement';
@@ -41,6 +42,12 @@ import EvaluationForm from './components/EvaluationForm';
 import EvaluationDashboard from './components/EvaluationDashboard';
 import AttendanceCheckIn from './components/AttendanceCheckIn';
 import { motion, AnimatePresence } from 'motion/react';
+
+type DebugLog = {
+  time: string;
+  source: string;
+  message: string;
+};
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -56,28 +63,65 @@ export default function App() {
   const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
 
+  const [debugLogs, setDebugLogs] = useState<DebugLog[]>([]);
+  const [yearsLoaded, setYearsLoaded] = useState(false);
+  const [coursesLoaded, setCoursesLoaded] = useState(false);
+
+  const addDebugLog = (source: string, message: string) => {
+    const log: DebugLog = {
+      time: new Date().toLocaleString('th-TH'),
+      source,
+      message,
+    };
+
+    console.log(`[${source}] ${message}`);
+    setDebugLogs((prev) => [log, ...prev].slice(0, 20));
+  };
+
+  const getTimeValue = (value: any) => {
+    if (!value) return 0;
+    if (typeof value?.toMillis === 'function') return value.toMillis();
+    if (typeof value?.seconds === 'number') return value.seconds * 1000;
+    const parsed = new Date(value).getTime();
+    return Number.isNaN(parsed) ? 0 : parsed;
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const viewParam = params.get('view');
     const cid = params.get('courseId');
 
+    addDebugLog('app:init', `projectId=${db.app.options.projectId} | databaseId=${databaseId}`);
+
     if (viewParam === 'evaluation') {
       setView('evaluation');
       setCourseIdParam(cid);
+      addDebugLog('app:init', `view=evaluation | courseId=${cid || 'null'}`);
     } else if (viewParam === 'attendance') {
       setView('attendance');
       setCourseIdParam(cid);
+      addDebugLog('app:init', `view=attendance | courseId=${cid || 'null'}`);
+    } else {
+      addDebugLog('app:init', 'view=public');
     }
 
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       setLoading(false);
+      addDebugLog(
+        'auth',
+        firebaseUser
+          ? `signed-in: ${firebaseUser.email || firebaseUser.uid}`
+          : 'signed-out'
+      );
     });
 
     return () => unsubscribe();
   }, []);
 
   useEffect(() => {
+    addDebugLog('firestore', 'starting snapshot listeners');
+
     const qYears = query(collection(db, 'academic_years'), orderBy('year', 'desc'));
     const unsubYears = onSnapshot(
       qYears,
@@ -88,11 +132,19 @@ export default function App() {
         })) as AcademicYear[];
 
         setAcademicYears(years);
+        setYearsLoaded(true);
         setFetchError(null);
+
+        addDebugLog(
+          'academic_years',
+          `loaded ${snap.size} docs | ids=${snap.docs.slice(0, 5).map((d) => d.id).join(', ') || 'none'}`
+        );
       },
       (error) => {
         console.error('Error fetching academic years:', error);
+        setYearsLoaded(true);
         setFetchError('ไม่สามารถเชื่อมต่อข้อมูลปีการศึกษาได้: ' + error.message);
+        addDebugLog('academic_years:error', error.message);
       }
     );
 
@@ -105,14 +157,6 @@ export default function App() {
           ...d.data(),
         })) as Course[];
 
-        const getTimeValue = (value: any) => {
-          if (!value) return 0;
-          if (typeof value?.toMillis === 'function') return value.toMillis();
-          if (typeof value?.seconds === 'number') return value.seconds * 1000;
-          const parsed = new Date(value).getTime();
-          return Number.isNaN(parsed) ? 0 : parsed;
-        };
-
         const sortedCourses = fetchedCourses.sort((a, b) => {
           const dateA = getTimeValue(a.date);
           const dateB = getTimeValue(b.date);
@@ -122,26 +166,37 @@ export default function App() {
         });
 
         setCourses(sortedCourses);
+        setCoursesLoaded(true);
         setFetchError(null);
+
+        addDebugLog(
+          'courses',
+          `loaded ${snap.size} docs | ids=${snap.docs.slice(0, 5).map((d) => d.id).join(', ') || 'none'}`
+        );
       },
       (error) => {
         console.error('Error fetching courses:', error);
+        setCoursesLoaded(true);
         setFetchError('ไม่สามารถเชื่อมต่อข้อมูลหลักสูตรได้: ' + error.message);
+        addDebugLog('courses:error', error.message);
       }
     );
 
     return () => {
       unsubYears();
       unsubCourses();
+      addDebugLog('firestore', 'snapshot listeners stopped');
     };
   }, [user]);
 
   const handleLogin = async () => {
     const provider = new GoogleAuthProvider();
     try {
+      addDebugLog('auth', 'opening Google sign-in popup');
       await signInWithPopup(auth, provider);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login failed', error);
+      addDebugLog('auth:error', error?.message || 'Google login failed');
     }
   };
 
@@ -151,10 +206,84 @@ export default function App() {
       setIsAdminAuthenticated(true);
       setAdminError('');
       setActiveTab('dashboard');
+      addDebugLog('admin', 'admin password accepted');
     } else {
       setAdminError('รหัสผ่านไม่ถูกต้อง');
+      addDebugLog('admin:error', 'invalid admin password');
     }
   };
+
+  const DebugPanel = () => (
+    <div className="mb-6 rounded-2xl border border-yellow-200 bg-yellow-50 p-4 text-xs text-gray-800 shadow-sm">
+      <div className="flex items-center gap-2 mb-3">
+        <Bug className="w-4 h-4 text-yellow-700" />
+        <h3 className="font-bold uppercase tracking-wider text-yellow-800">Debug Panel</h3>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 font-mono">
+        <DebugItem label="projectId" value={String(db.app.options.projectId || '-')} />
+        <DebugItem label="databaseId" value={databaseId} />
+        <DebugItem label="view" value={view} />
+        <DebugItem label="activeTab" value={activeTab} />
+        <DebugItem label="user" value={user?.email || 'not signed in'} />
+        <DebugItem label="loading" value={String(loading)} />
+        <DebugItem label="yearsLoaded" value={String(yearsLoaded)} />
+        <DebugItem label="coursesLoaded" value={String(coursesLoaded)} />
+        <DebugItem label="academicYears.length" value={String(academicYears.length)} />
+        <DebugItem label="courses.length" value={String(courses.length)} />
+        <DebugItem label="fetchError" value={fetchError || 'none'} />
+        <DebugItem label="courseIdParam" value={courseIdParam || 'null'} />
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white rounded-xl border border-yellow-100 p-3">
+          <p className="font-semibold mb-2 text-yellow-900">academic_years preview</p>
+          <pre className="text-[11px] whitespace-pre-wrap break-all text-gray-700">
+            {academicYears.length > 0
+              ? JSON.stringify(academicYears.slice(0, 2), null, 2)
+              : 'no academic_years data'}
+          </pre>
+        </div>
+
+        <div className="bg-white rounded-xl border border-yellow-100 p-3">
+          <p className="font-semibold mb-2 text-yellow-900">courses preview</p>
+          <pre className="text-[11px] whitespace-pre-wrap break-all text-gray-700">
+            {courses.length > 0
+              ? JSON.stringify(
+                  courses.slice(0, 2).map((course: any) => ({
+                    ...course,
+                    date:
+                      typeof course?.date?.toDate === 'function'
+                        ? course.date.toDate().toISOString()
+                        : course?.date,
+                  })),
+                  null,
+                  2
+                )
+              : 'no courses data'}
+          </pre>
+        </div>
+      </div>
+
+      <div className="mt-4 bg-white rounded-xl border border-yellow-100 p-3">
+        <p className="font-semibold mb-2 text-yellow-900">debug logs</p>
+        <div className="space-y-2 max-h-72 overflow-y-auto">
+          {debugLogs.length > 0 ? (
+            debugLogs.map((log, index) => (
+              <div key={`${log.time}-${index}`} className="border-b border-gray-100 pb-2 last:border-b-0">
+                <p className="font-mono text-[11px] text-gray-500">
+                  [{log.time}] {log.source}
+                </p>
+                <p className="text-[11px] text-gray-800 break-all">{log.message}</p>
+              </div>
+            ))
+          ) : (
+            <p className="text-[11px] text-gray-500">no logs yet</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   if (loading) {
     return (
@@ -239,7 +368,6 @@ export default function App() {
                     />
                     Sign in with Google
                   </button>
-
                   <p className="mt-2 text-[10px] text-red-500 font-bold text-center italic">
                     * จำเป็นต้องใช้ Google Login เพื่อจัดการฐานข้อมูล
                   </p>
@@ -339,6 +467,7 @@ export default function App() {
                 setIsAdminAuthenticated(false);
                 setView('public');
                 setAdminPassword('');
+                addDebugLog('admin', 'admin logout');
               }}
               className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-xl transition-colors"
             >
@@ -349,6 +478,8 @@ export default function App() {
         </aside>
 
         <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+          <DebugPanel />
+
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -402,7 +533,10 @@ export default function App() {
 
         <div className="flex items-center gap-4">
           <button
-            onClick={() => setView('admin')}
+            onClick={() => {
+              setView('admin');
+              addDebugLog('nav', 'go to admin view');
+            }}
             className="text-gray-300 hover:text-primary p-2 rounded-full transition-colors"
             title="Admin Login"
           >
@@ -422,7 +556,10 @@ export default function App() {
               <div className="text-right hidden sm:block">
                 <p className="text-xs font-bold">{user.displayName}</p>
                 <button
-                  onClick={() => signOut(auth)}
+                  onClick={() => {
+                    addDebugLog('auth', 'sign out clicked');
+                    signOut(auth);
+                  }}
                   className="text-[10px] text-red-600 hover:underline"
                 >
                   ออกจากระบบ
@@ -440,6 +577,8 @@ export default function App() {
       </header>
 
       <main className="flex-1 p-4 md:p-12">
+        <DebugPanel />
+
         {fetchError && (
           <div className="max-w-2xl mx-auto mb-8 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-800">
             <AlertCircle className="w-5 h-5 flex-shrink-0" />
@@ -503,6 +642,15 @@ export default function App() {
   );
 }
 
+function DebugItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-white rounded-xl border border-yellow-100 px-3 py-2">
+      <p className="text-[10px] uppercase tracking-wider text-gray-500">{label}</p>
+      <p className="font-mono text-[11px] break-all text-gray-900 mt-1">{value}</p>
+    </div>
+  );
+}
+
 function NavItem({
   active,
   onClick,
@@ -533,4 +681,3 @@ function NavItem({
     </button>
   );
 }
-          
