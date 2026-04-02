@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot, addDoc, Timestamp } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, databaseId } from '../firebase';
 import { AcademicYear, Course, Registration } from '../types';
 import {
   BarChart,
@@ -110,7 +110,7 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
   const statsByCourse = courses.map((course) => {
     const count = registrations.filter((r) => r.courseId === course.id).length;
     return {
-      name: course.title.length > 20 ? course.title.substring(0, 20) + '...' : course.title,
+      name: course.title.length > 20 ? `${course.title.substring(0, 20)}...` : course.title,
       fullName: course.title,
       count,
       capacity: course.maxParticipants,
@@ -127,6 +127,7 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
 
   const totalRegistrations = registrations.length;
   const activeCourses = activeCoursesList.length;
+  const currentAcademicYear = academicYears.find((y) => y.status === 'active')?.year || '-';
   const isEmpty = academicYears.length === 0 && courses.length === 0;
 
   const handlePrint = () => {
@@ -183,7 +184,7 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
           Project: {db.app.options.projectId}
         </span>
         <span className="bg-white px-2 py-0.5 rounded border border-gray-200 text-gray-700">
-          Database: {(db as any).databaseId || '(default)'}
+          Database: {databaseId}
         </span>
         {user && (
           <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100">
@@ -237,7 +238,7 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
         <StatCard
           icon={<Calendar className="w-6 h-6 text-primary" />}
           label="ปีการศึกษาปัจจุบัน"
-          value={academicYears.find((y) => y.status === 'active')?.year || '-'}
+          value={currentAcademicYear}
           subLabel=""
         />
       </div>
@@ -278,9 +279,7 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
                   <tr key={course.id} className="hover:bg-gray-50 transition-colors">
                     <td className="py-4">
                       <p className="text-sm font-bold text-gray-900">{course.title}</p>
-                      <p className="text-[10px] text-gray-400 uppercase">
-                        {formatDate(course.date)}
-                      </p>
+                      <p className="text-[10px] text-gray-400 uppercase">{formatDate(course.date)}</p>
                     </td>
                     <td className="py-4 text-center font-bold text-gray-700">{count}</td>
                     <td className="py-4 text-center text-gray-500">{course.maxParticipants}</td>
@@ -338,7 +337,7 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
                   }}
                 />
                 <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                  {statsByCourse.map((entry, index) => (
+                  {statsByCourse.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Bar>
@@ -364,7 +363,7 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
                   paddingAngle={5}
                   dataKey="count"
                 >
-                  {statsByYear.map((entry, index) => (
+                  {statsByYear.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
