@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, onSnapshot, where, addDoc, Timestamp } from 'firebase/firestore';
-import { db } from '../firebase';
+import { collection, onSnapshot, addDoc, Timestamp } from 'firebase/firestore';
+import { db, databaseId } from '../firebase';
 import { AcademicYear, Course, Registration } from '../types';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
   Cell,
   PieChart,
   Pie
@@ -17,7 +17,6 @@ import {
 import { Users, BookOpen, Calendar, Printer, FileText, Plus } from 'lucide-react';
 import { motion } from 'motion/react';
 import { formatDate } from '../utils';
-
 import { User } from 'firebase/auth';
 
 interface Props {
@@ -32,27 +31,31 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
   const [isSeeding, setIsSeeding] = useState(false);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'registrations'), (snap) => {
-      setRegistrations(snap.docs.map(d => ({ id: d.id, ...d.data() } as Registration)));
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching registrations:", error);
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+      collection(db, 'registrations'),
+      (snap) => {
+        setRegistrations(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Registration)));
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Error fetching registrations:', error);
+        setLoading(false);
+      }
+    );
+
     return () => unsub();
   }, [user]);
 
   const seedDemoData = async () => {
     if (!user) return;
+
     setIsSeeding(true);
     try {
-      // 1. Add Academic Year 2568
       const yearRef = await addDoc(collection(db, 'academic_years'), {
         year: '2568',
         status: 'active'
       });
 
-      // 2. Add Sample Courses
       const sampleCourses = [
         {
           title: 'การใช้ AI ในการจัดการเรียนการสอน (Generative AI for Educators)',
@@ -87,15 +90,14 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
       }
     } catch (err) {
       console.error(err);
-      alert("เกิดข้อผิดพลาดในการสร้างข้อมูลตัวอย่าง: " + (err instanceof Error ? err.message : ''));
+      alert('เกิดข้อผิดพลาดในการสร้างข้อมูลตัวอย่าง: ' + (err instanceof Error ? err.message : ''));
     } finally {
       setIsSeeding(false);
     }
   };
 
-  // Data Processing
-  const statsByCourse = courses.map(course => {
-    const count = registrations.filter(r => r.courseId === course.id).length;
+  const statsByCourse = courses.map((course) => {
+    const count = registrations.filter((r) => r.courseId === course.id).length;
     return {
       name: course.title.length > 20 ? course.title.substring(0, 20) + '...' : course.title,
       fullName: course.title,
@@ -104,8 +106,8 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
     };
   });
 
-  const statsByYear = academicYears.map(year => {
-    const count = registrations.filter(r => r.academicYearId === year.id).length;
+  const statsByYear = academicYears.map((year) => {
+    const count = registrations.filter((r) => r.academicYearId === year.id).length;
     return {
       name: year.year,
       count
@@ -113,8 +115,9 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
   });
 
   const totalRegistrations = registrations.length;
-  const activeCourses = courses.filter(c => {
-    const year = academicYears.find(y => y.id === c.academicYearId);
+
+  const activeCourses = courses.filter((c) => {
+    const year = academicYears.find((y) => y.id === c.academicYearId);
     return year?.status === 'active';
   }).length;
 
@@ -142,7 +145,7 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
           <p className="text-gray-500">ภาพรวมการลงทะเบียนอบรมวิชาการ</p>
         </div>
         <div className="flex gap-3">
-          <button 
+          <button
             onClick={handlePrint}
             className="flex items-center gap-2 bg-white border border-gray-200 px-4 py-2 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors shadow-sm"
           >
@@ -157,7 +160,10 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
           <Users className="w-5 h-5 flex-shrink-0" />
           <div>
             <p className="font-bold text-sm">คุณยังไม่ได้เข้าสู่ระบบด้วย Google</p>
-            <p className="text-[10px] opacity-70 mt-1">ข้อมูล "จำนวนผู้ลงทะเบียน" จะไม่แสดงหากคุณไม่ได้เข้าสู่ระบบด้วย Google เพื่อยืนยันสิทธิ์การเข้าถึงข้อมูลส่วนบุคคล</p>
+            <p className="text-[10px] opacity-70 mt-1">
+              ข้อมูล "จำนวนผู้ลงทะเบียน" จะไม่แสดงหากคุณไม่ได้เข้าสู่ระบบด้วย Google
+              เพื่อยืนยันสิทธิ์การเข้าถึงข้อมูลส่วนบุคคล
+            </p>
           </div>
         </div>
       )}
@@ -168,12 +174,15 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
           <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
           <span className="text-gray-500">Connected:</span>
         </div>
+
         <span className="bg-white px-2 py-0.5 rounded border border-gray-200 text-gray-700">
-          Project: {db.app.options.projectId}
+          Project: {db.app.options.projectId || 'n8n-real'}
         </span>
+
         <span className="bg-white px-2 py-0.5 rounded border border-gray-200 text-gray-700">
-          Database: {(db as any).databaseId || '(default)'}
+          Database: {databaseId}
         </span>
+
         {user && (
           <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100">
             User: {user.email}
@@ -186,10 +195,11 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
           <BookOpen className="w-12 h-12 text-amber-500 mx-auto mb-4" />
           <h3 className="text-lg font-bold text-amber-900 mb-2">ไม่พบข้อมูลในระบบ</h3>
           <p className="text-sm text-amber-700 mb-6 max-w-md mx-auto">
-            หากคุณเพิ่งทำการ Remix แอป หรือเพิ่งเริ่มใช้งานครั้งแรก ฐานข้อมูลจะยังว่างเปล่า 
-            คุณสามารถเริ่มสร้างข้อมูลเองได้ที่เมนู "จัดการหลักสูตร" หรือใช้ปุ่มด้านล่างเพื่อสร้างข้อมูลตัวอย่าง
+            หากคุณเพิ่งทำการ Remix แอป หรือเพิ่งเริ่มใช้งานครั้งแรก ฐานข้อมูลจะยังว่างเปล่า
+            คุณสามารถเริ่มสร้างข้อมูลเองได้ที่เมนู "จัดการหลักสูตร"
+            หรือใช้ปุ่มด้านล่างเพื่อสร้างข้อมูลตัวอย่าง
           </p>
-          <button 
+          <button
             onClick={seedDemoData}
             disabled={isSeeding}
             className="inline-flex items-center gap-2 bg-amber-500 text-white px-6 py-3 rounded-xl font-bold hover:bg-amber-600 transition-all shadow-lg shadow-amber-200 disabled:opacity-50"
@@ -209,29 +219,27 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
         </div>
       )}
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard 
+        <StatCard
           icon={<Users className="w-6 h-6 text-primary" />}
           label="จำนวนผู้ลงทะเบียนทั้งหมด"
           value={totalRegistrations}
           subLabel="คน"
         />
-        <StatCard 
+        <StatCard
           icon={<BookOpen className="w-6 h-6 text-primary" />}
           label="หลักสูตรที่เปิดรับ (Active)"
           value={activeCourses}
           subLabel="หลักสูตร"
         />
-        <StatCard 
+        <StatCard
           icon={<Calendar className="w-6 h-6 text-primary" />}
           label="ปีการศึกษาปัจจุบัน"
-          value={academicYears.find(y => y.status === 'active')?.year || '-'}
+          value={academicYears.find((y) => y.status === 'active')?.year || '-'}
           subLabel=""
         />
       </div>
 
-      {/* Remaining Seats Summary Table */}
       <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 print:hidden">
         <h3 className="font-bold serif mb-6 flex items-center gap-2">
           <Users className="w-5 h-5 text-primary" />
@@ -249,43 +257,47 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {courses.filter(c => {
-                const year = academicYears.find(y => y.id === c.academicYearId);
-                return year?.status === 'active' && c.published === true;
-              }).map(course => {
-                const count = registrations.filter(r => r.courseId === course.id).length;
-                const remaining = Math.max(0, course.maxParticipants - count);
-                const isFull = remaining <= 0;
-                return (
-                  <tr key={course.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="py-4">
-                      <p className="text-sm font-bold text-gray-900">{course.title}</p>
-                      <p className="text-[10px] text-gray-400 uppercase">{formatDate(course.date)}</p>
-                    </td>
-                    <td className="py-4 text-center font-bold text-gray-700">{count}</td>
-                    <td className="py-4 text-center text-gray-500">{course.maxParticipants}</td>
-                    <td className="py-4 text-center">
-                      <span className={`font-black ${remaining <= 5 ? 'text-red-500' : 'text-green-600'}`}>
-                        {remaining}
-                      </span>
-                    </td>
-                    <td className="py-4 text-center">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
-                        isFull ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'
-                      }`}>
-                        {isFull ? 'เต็มแล้ว' : 'เปิดรับ'}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
+              {courses
+                .filter((c) => {
+                  const year = academicYears.find((y) => y.id === c.academicYearId);
+                  return year?.status === 'active' && c.published === true;
+                })
+                .map((course) => {
+                  const count = registrations.filter((r) => r.courseId === course.id).length;
+                  const remaining = Math.max(0, course.maxParticipants - count);
+                  const isFull = remaining <= 0;
+
+                  return (
+                    <tr key={course.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="py-4">
+                        <p className="text-sm font-bold text-gray-900">{course.title}</p>
+                        <p className="text-[10px] text-gray-400 uppercase">{formatDate(course.date)}</p>
+                      </td>
+                      <td className="py-4 text-center font-bold text-gray-700">{count}</td>
+                      <td className="py-4 text-center text-gray-500">{course.maxParticipants}</td>
+                      <td className="py-4 text-center">
+                        <span className={`font-black ${remaining <= 5 ? 'text-red-500' : 'text-green-600'}`}>
+                          {remaining}
+                        </span>
+                      </td>
+                      <td className="py-4 text-center">
+                        <span
+                          className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
+                            isFull ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'
+                          }`}
+                        >
+                          {isFull ? 'เต็มแล้ว' : 'เปิดรับ'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Chart: Registrations by Course */}
         <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
           <h3 className="font-bold serif mb-6 flex items-center gap-2">
             <FileText className="w-5 h-5 text-primary" />
@@ -296,17 +308,21 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
               <BarChart data={statsByCourse} layout="vertical" margin={{ left: 40, right: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
                 <XAxis type="number" hide />
-                <YAxis 
-                  dataKey="name" 
-                  type="category" 
-                  width={150} 
+                <YAxis
+                  dataKey="name"
+                  type="category"
+                  width={150}
                   tick={{ fontSize: 10, fill: '#888' }}
                   axisLine={false}
                   tickLine={false}
                 />
-                <Tooltip 
+                <Tooltip
                   cursor={{ fill: '#f5f5f0' }}
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                  contentStyle={{
+                    borderRadius: '12px',
+                    border: 'none',
+                    boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)'
+                  }}
                 />
                 <Bar dataKey="count" radius={[0, 4, 4, 0]}>
                   {statsByCourse.map((entry, index) => (
@@ -318,7 +334,6 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
           </div>
         </div>
 
-        {/* Chart: Registrations by Year */}
         <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
           <h3 className="font-bold serif mb-6 flex items-center gap-2">
             <Calendar className="w-5 h-5 text-primary" />
@@ -347,15 +362,19 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
           <div className="flex flex-wrap justify-center gap-4 mt-4">
             {statsByYear.map((entry, index) => (
               <div key={entry.name} className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                <span className="text-xs text-gray-500 font-medium">ปี {entry.name} ({entry.count})</span>
+                <div
+                  className="w-3 h-3 rounded-full"
+                  style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                />
+                <span className="text-xs text-gray-500 font-medium">
+                  ปี {entry.name} ({entry.count})
+                </span>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Print Report View (Hidden in UI, visible in Print) */}
       <div className="hidden print:block">
         <div className="text-center mb-10">
           <h1 className="text-2xl font-bold serif">รายงานสรุปผลการลงทะเบียนอบรมวิชาการ</h1>
@@ -373,19 +392,23 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
             </tr>
           </thead>
           <tbody>
-            {courses.map(course => {
-              const year = academicYears.find(y => y.id === course.academicYearId);
-              const count = registrations.filter(r => r.courseId === course.id).length;
+            {courses.map((course) => {
+              const year = academicYears.find((y) => y.id === course.academicYearId);
+              const count = registrations.filter((r) => r.courseId === course.id).length;
+
               return (
                 <tr key={course.id} className="border-b border-gray-100">
                   <td className="py-4">{course.title}</td>
                   <td className="text-center py-4 text-xs">
-                    {formatDate(course.date)}<br/>
+                    {formatDate(course.date)}
+                    <br />
                     {course.startTime} - {course.endTime}
                   </td>
                   <td className="text-center py-4">{course.room || '-'}</td>
                   <td className="text-center py-4">{year?.year}</td>
-                  <td className="text-center py-4 font-bold">{count} / {course.maxParticipants}</td>
+                  <td className="text-center py-4 font-bold">
+                    {count} / {course.maxParticipants}
+                  </td>
                   <td className="text-center py-4">
                     {count >= course.maxParticipants ? 'เต็ม' : 'เปิดรับ'}
                   </td>
@@ -399,9 +422,19 @@ export default function Dashboard({ academicYears, courses, user }: Props) {
   );
 }
 
-function StatCard({ icon, label, value, subLabel }: { icon: React.ReactNode, label: string, value: string | number, subLabel: string }) {
+function StatCard({
+  icon,
+  label,
+  value,
+  subLabel
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
+  subLabel: string;
+}) {
   return (
-    <motion.div 
+    <motion.div
       whileHover={{ y: -5 }}
       className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-5"
     >
